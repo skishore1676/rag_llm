@@ -5,7 +5,7 @@ __pycache__/
 *.pyd
 env/
 .env
-.ds
+.DS_Store
 config.yaml
 
 
