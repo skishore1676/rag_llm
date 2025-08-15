@@ -50,7 +50,9 @@ async function fetchAndPopulateSettings() {
         const response = await fetch('/config');
         const config = await response.json();
 
-        document.getElementById('llmModel').value = config.llm.model;
+        // Correctly select the model based on the LLM type
+        const activeModel = config.llm.type === 'ollama' ? config.llm.ollama_model : config.llm.model;
+        document.getElementById('llmModel').value = activeModel;
         document.getElementById('llmTemperature').value = config.llm.temperature;
         document.getElementById('llmTemperatureValue').textContent = config.llm.temperature;
         document.getElementById('chunkSize').value = config.indexing.chunk_size;
@@ -96,9 +98,10 @@ document.getElementById('settingsForm').addEventListener('submit', async (event)
     settingsStatus.classList.remove('alert-success', 'alert-danger');
     settingsStatus.classList.add('alert-info');
 
+    const selectedModel = document.getElementById('llmModel').value;
+    const isOllamaModel = OLLAMA_MODELS.includes(selectedModel);
     const newConfig = {
         llm: {
-            model: document.getElementById('llmModel').value,
             temperature: parseFloat(document.getElementById('llmTemperature').value),
         },
         indexing: {
@@ -113,6 +116,13 @@ document.getElementById('settingsForm').addEventListener('submit', async (event)
             top_n: parseInt(document.getElementById('rerankTopN').value),
         }
     };
+
+    // Set the correct model key based on whether it's an Ollama model or not
+    if (isOllamaModel) {
+        newConfig.llm.ollama_model = selectedModel;
+    } else {
+        newConfig.llm.model = selectedModel;
+    }
 
     try {
         const response = await fetch('/config', {

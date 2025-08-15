@@ -1,0 +1,35 @@
+
+# RAG LLM Project Configuration
+
+# LLM Settings
+llm:
+  type: "ollama" # "openai" or "ollama"
+  model: "gpt-3.5-turbo" # Default OpenAI model
+  temperature: 0.5
+  api_key: "YOUR_OPENAI_API_KEY" # Required for openai
+  ollama_model: "llama2" # Default Ollama model
+  ollama_base_url: "http://localhost:11434" # Used if type is "ollama"
+  openai_models: ["gpt-3.5-turbo", "gpt-4", "gpt-4-turbo-preview"]
+  ollama_models: ["llama2", "mistral", "gpt-oss:20b"]
+
+# Embedding Model Settings
+embedding:
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+
+# Indexing and Storage Settings
+indexing:
+  storage_path: "./data/default_index" # IMPORTANT: Path to store the vector database and index metadata.
+  chunk_size: 512
+  project_paths:
+    - "/path/to/your/first/project"
+    - "/path/to/your/second/project"
+
+# Retrieval Settings
+retrieval:
+  similarity_top_k: 3
+
+# Re-ranking Settings
+rerank:
+  enable: true
+  model: "cross-encoder/ms-marco-MiniLM-L-6-v2"
+  top_n: 2

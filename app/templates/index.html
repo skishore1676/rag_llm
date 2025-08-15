@@ -84,11 +84,17 @@
                         <form id="settingsForm">
                             <div class="mb-3">
                                 <label for="llmModel" class="form-label">LLM Model (OpenAI/Ollama):</label>
-                                <select class="form-select" id="llmModel" name="llmModel" data-bs-toggle="tooltip" data-bs-placement="right" title="Specify the exact model name for your chosen LLM provider.">
-                                    <option value="gpt-3.5-turbo">gpt-3.5-turbo (OpenAI)</option>
-                                    <option value="gpt-4">gpt-4 (OpenAI)</option>
-                                    <option value="llama2">llama2 (Ollama)</option>
-                                    <option value="mistral">mistral (Ollama)</option>
+                                <select class="form-select" id="llmModel" name="llmModel" data-bs-toggle="tooltip" data-bs-placement="right" title="Specify the exact model name for your chosen LLM provider. This list is populated from your config.yaml file.">
+                                    <optgroup label="OpenAI">
+                                        {% for model in openai_models %}
+                                        <option value="{{ model }}">{{ model }}</option>
+                                        {% endfor %}
+                                    </optgroup>
+                                    <optgroup label="Ollama">
+                                        {% for model in ollama_models %}
+                                        <option value="{{ model }}">{{ model }}</option>
+                                        {% endfor %}
+                                    </optgroup>
                                 </select>
                             </div>
                             <div class="mb-3">
@@ -128,6 +134,11 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <script>
+        // Pass model lists from backend to frontend JavaScript
+        const OPENAI_MODELS = {{ openai_models | tojson }};
+        const OLLAMA_MODELS = {{ ollama_models | tojson }};
+    </script>
     <script src="/static/script.js"></script>
 </body>
 </html>

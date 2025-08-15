@@ -8,18 +8,14 @@ from llama_index.core import (
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.vector_stores.chroma import ChromaVectorStore
 import chromadb
-
-from app.core.config import load_config
-
-# Load configuration
-config = load_config()
-
-def create_index(project_path: str):
+ 
+def create_index(project_path: str, config: dict):
     """
     Creates a vector index for the documents in the given project path.
 
     Args:
         project_path (str): The absolute path to the project directory.
+        config (dict): The application configuration dictionary.
     """
     print("Starting the indexing process...")
 
@@ -27,6 +23,8 @@ def create_index(project_path: str):
     print(f"Initializing embedding model: {config['embedding']['model']}")
     embed_model = HuggingFaceEmbedding(model_name=config["embedding"]["model"])
     Settings.embed_model = embed_model
+    Settings.chunk_size = config["indexing"]["chunk_size"]
+    print(f"Setting chunk size to: {Settings.chunk_size}")
 
     # 2. Load documents
     print(f"Loading documents from: {project_path}")

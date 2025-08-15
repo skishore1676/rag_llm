@@ -1,27 +1,29 @@
 llm:
-  type: ollama  # Options: openai, ollama
-  api_key: "sk-..." # Loaded from .env for security (for openai)
-  model: "gpt-3.5-turbo" # For openai
-  temperature: 0.1
-  ollama_base_url: "http://localhost:11434" # For ollama
-  ollama_model: "llama2" # For ollama
-
+  type: ollama
+  model: llama2
+  temperature: 0.5
+  api_key: YOUR_OPENAI_API_KEY
+  ollama_model: llama2
+  ollama_base_url: http://localhost:11434
+  openai_models:
+  - gpt-3.5-turbo
+  - gpt-4
+  - gpt-4-turbo-preview
+  ollama_models:
+  - llama2
+  - mistral
+  - gpt-oss:20b
 embedding:
-  model: "sentence-transformers/all-MiniLM-L6-v2"
-
+  model: sentence-transformers/all-MiniLM-L6-v2
 indexing:
+  storage_path: ./data/default_index
   chunk_size: 512
-  chunk_overlap: 20
-  storage_path: "./data/default_index"
   project_paths:
-    - "/Users/suman/Google Drive/01 Acads and Learning/ISB/Acads/Term_1"
-    - "/Users/suman/Documents/MyProjects/ProjectX"
-    - "/Users/suman/Code/MyRepo"
-
+  - /Users/suman/Google Drive/04 Personal/Life/Communication
+  - /Users/suman/Google Drive/01 Acads and Learning/ISB/Acads/Term_1
 retrieval:
   similarity_top_k: 3
-
 rerank:
-  enable: false
-  model: "cross-encoder/ms-marco-MiniLM-L-6-v2"
-  top_n: 5 # Number of documents to return after re-ranking
+  enable: true
+  model: cross-encoder/ms-marco-MiniLM-L-6-v2
+  top_n: 2

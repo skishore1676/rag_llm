@@ -1,7 +1,14 @@
 import argparse
 import os
+from llama_index.core import (
+    StorageContext,
+    load_index_from_storage,
+)
+from llama_index.vector_stores.chroma import ChromaVectorStore
+import chromadb
 from app.core.indexer import create_index
 from app.core.querier import query_index
+from app.core.config import load_config
 
 def main():
     parser = argparse.ArgumentParser(description="RAG LLM CLI")
@@ -17,15 +24,30 @@ def main():
 
     args = parser.parse_args()
 
+    config = load_config()
+
     if args.command == "index":
         if not os.path.isabs(args.path):
             print("Error: Please provide an absolute path for indexing.")
             return
-        create_index(args.path)
+        create_index(args.path, config)
     elif args.command == "query":
-        answer = query_index(args.question)
+        storage_path = config["indexing"]["storage_path"]
+        if not os.path.exists(storage_path):
+            print("Error: Index not found. Please run the 'index' command first.")
+            return
+
+        print("Loading index for CLI query...")
+        db = chromadb.PersistentClient(path=storage_path)
+        chroma_collection = db.get_or_create_collection("default_collection")
+        vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
+        storage_context = StorageContext.from_defaults(vector_store=vector_store, persist_dir=storage_path)
+        index = load_index_from_storage(storage_context)
+        print("Index loaded.")
+
+        response = query_index(args.question, index, config)
         print("\nAnswer:")
-        print(answer)
+        print(response["answer"])
 
 if __name__ == "__main__":
     main()
