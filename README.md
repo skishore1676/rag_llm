@@ -48,6 +48,14 @@ This project provides a web-based and command-line interface for a Retrieval-Aug
     *   **`llm.api_key`**: If you are using OpenAI, you must add your API key here.
     *   **`project_paths`**: You can pre-populate the list of directories you want to index for easy access in the UI.
 
+#### Embedding Model Configuration
+
+The `embedding` section in the `config.yaml` file is critical for the correct functioning of the RAG system. It specifies the model used to generate embeddings for both the documents during indexing and the queries during retrieval. It is crucial that the same embedding model is used for both processes.
+
+*   **`embedding.model`**: This setting defines the Hugging Face model to be used for generating embeddings. The default model is `sentence-transformers/all-MiniLM-L6-v2`. You can change this to any other sentence-transformer model from the Hugging Face Hub.
+
+**Important:** If you change the embedding model after you have already indexed documents, you will need to re-index your documents for the changes to take effect. This is because the new model will generate embeddings with a different dimension, which will cause a mismatch with the existing embeddings in the vector store.
+
 ### 4. How to Run
 
 You can interact with the application through the Web UI or the Command-Line Interface.
@@ -106,7 +114,7 @@ When you index a directory, the following steps occur:
 When you ask a question, the RAG (Retrieval-Augmented Generation) pipeline is executed:
 
 1.  **Initiation:** The user submits a question through the Web UI or CLI.
-2.  **Configuration Loading:** The system loads the index from the `storage_path`. It configures the LLM (either `Ollama` or `OpenAI`) and the `HuggingFaceEmbedding` model based on the user's choice and the `config.yaml` file.
+2.  **Configuration Loading:** The system loads the index from the `storage_path`. It configures the LLM (either `Ollama` or `OpenAI`) and the `HuggingFaceEmbedding` model based on the user's choice and the `config.yaml` file. It is crucial that the same embedding model is used for both indexing and querying.
 3.  **Query Engine Creation:** A LlamaIndex `QueryEngine` is created from the loaded index.
 4.  **Retrieval:**
     a. The user's question is converted into a vector using the same embedding model from the indexing phase.

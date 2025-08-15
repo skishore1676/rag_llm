@@ -4,7 +4,9 @@ from llama_index.core import (
     StorageContext,
     load_index_from_storage,
     VectorStoreIndex,
+    Settings,
 )
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.vector_stores.chroma import ChromaVectorStore
 import chromadb
 from fastapi.staticfiles import StaticFiles
@@ -30,13 +32,22 @@ def startup_event():
     """Load the index into memory when the application starts."""
     global index
     storage_path = config["indexing"]["storage_path"]
+    storage_path = config["indexing"]["storage_path"]
     if os.path.exists(storage_path):
         print("Loading index from disk at startup...")
         try:
+            # 1. Configure embedding model
+            print(f"Initializing embedding model: {config['embedding']['model']}")
+            embed_model = HuggingFaceEmbedding(model_name=config["embedding"]["model"])
+            Settings.embed_model = embed_model
+
+            # 2. Load the index from storage
             db = chromadb.PersistentClient(path=storage_path)
             chroma_collection = db.get_or_create_collection("default_collection")
             vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
-            storage_context = StorageContext.from_defaults(vector_store=vector_store, persist_dir=storage_path)
+            storage_context = StorageContext.from_defaults(
+                vector_store=vector_store, persist_dir=storage_path
+            )
             index = load_index_from_storage(storage_context)
             print("Index loaded successfully.")
         except Exception as e:
