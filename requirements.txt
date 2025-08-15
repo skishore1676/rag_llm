@@ -1,0 +1,16 @@
+llama-index
+python-dotenv
+pyyaml
+llama-index-embeddings-huggingface
+openai
+fastapi
+uvicorn
+docx2txt
+openpyxl
+python-pptx
+xlrd
+chromadb
+llama-index-vector-stores-chroma
+python-multipart
+llama-index-llms-ollama
+sentence-transformers

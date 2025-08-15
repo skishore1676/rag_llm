@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG LLM Interface</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1 class="my-4 text-center">RAG LLM Project Interface</h1>
+
+        <div class="card mb-4">
+            <div class="card-header"><h2>Index Project</h2></div>
+            <div class="card-body">
+                <form id="indexForm">
+                    <div class="mb-3">
+                        <label for="projectPath" class="form-label">Project Path (Absolute):</label>
+                <input type="text" class="form-control" id="projectPath" name="projectPath" placeholder="/Users/your_user/your_project" required>
+                <div class="mt-2">
+                    <label for="predefinedPath" class="form-label">Or select from predefined paths:</label>
+                    <select class="form-select" id="predefinedPath">
+                        <option value="">-- Select a path --</option>
+                        {% for path in project_paths %}
+                        <option value="{{ path }}">{{ path }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Index Project</button>
+                </form>
+                <div id="indexStatus" class="mt-3 alert" role="alert"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h2>Chat with your Documents</h2>
+                <button type="button" class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#settingsModal">Settings</button>
+            </div>
+            <div class="card-body">
+                <div id="chatHistory" class="mb-3 p-3 border rounded" style="max-height: 400px; overflow-y: auto; background-color: #f8f9fa;"></div>
+                <button type="button" id="clearChatBtn" class="btn btn-outline-secondary btn-sm mb-3">Clear Chat History</button>
+
+                <form id="queryForm">
+                    <div class="mb-3">
+                        <label for="question" class="form-label">Your Question:</label>
+                        <input type="text" class="form-control" id="question" name="question" placeholder="What is the main function of X?" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="llmType" class="form-label">Choose LLM:</label>
+                        <select id="llmType" name="llmType" class="form-select">
+                            <option value="openai" {% if default_llm_type == "openai" %}selected{% endif %}>OpenAI (API)</option>
+                            <option value="ollama" {% if default_llm_type == "ollama" %}selected{% endif %}>Ollama (Local)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="rerankEnable" name="rerankEnable">
+                        <label class="form-check-label" for="rerankEnable">Enable Re-ranking</label>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-success">Ask</button>
+                </form>
+                <div id="queryAnswer" class="mt-3 alert" role="alert"></div>
+                <div id="sourceDocuments" class="mt-3 p-3 border rounded" style="max-height: 200px; overflow-y: auto; background-color: #f8f9fa; display: none;">
+                    <h5>Source Documents:</h5>
+                    <ul id="sourceList" class="list-group"></ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Modal -->
+        <div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="settingsModalLabel">Application Settings</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="settingsForm">
+                            <div class="mb-3">
+                                <label for="llmModel" class="form-label">LLM Model (OpenAI/Ollama):</label>
+                                <select class="form-select" id="llmModel" name="llmModel" data-bs-toggle="tooltip" data-bs-placement="right" title="Specify the exact model name for your chosen LLM provider.">
+                                    <option value="gpt-3.5-turbo">gpt-3.5-turbo (OpenAI)</option>
+                                    <option value="gpt-4">gpt-4 (OpenAI)</option>
+                                    <option value="llama2">llama2 (Ollama)</option>
+                                    <option value="mistral">mistral (Ollama)</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="llmTemperature" class="form-label">LLM Temperature: <span id="llmTemperatureValue"></span></label>
+                                <input type="range" class="form-range" id="llmTemperature" name="llmTemperature" min="0.0" max="1.0" step="0.1" data-bs-toggle="tooltip" data-bs-placement="right" title="Controls the randomness of the LLM's responses. Lower values (e.g., 0.1) make it more deterministic, higher values (e.g., 0.9) make it more creative.">
+                            </div>
+                            <div class="mb-3">
+                                <label for="chunkSize" class="form-label">Indexing Chunk Size: <span id="chunkSizeValue"></span></label>
+                                <input type="range" class="form-range" id="chunkSize" name="chunkSize" min="128" max="1024" step="64" data-bs-toggle="tooltip" data-bs-placement="right" title="The maximum size (in tokens) of text chunks when indexing documents. Smaller chunks can improve retrieval precision but increase index size.">
+                            </div>
+                            <div class="mb-3">
+                                <label for="similarityTopK" class="form-label">Retrieval Similarity Top K: <span id="similarityTopKValue"></span></label>
+                                <input type="range" class="form-range" id="similarityTopK" name="similarityTopK" min="1" max="10" step="1" data-bs-toggle="tooltip" data-bs-placement="right" title="The number of top similar document chunks to retrieve from the vector store for the LLM to consider.">
+                            </div>
+                            <div class="mb-3 form-check">
+                                <input type="checkbox" class="form-check-input" id="rerankEnableSettings" name="rerankEnableSettings" data-bs-toggle="tooltip" data-bs-placement="right" title="Enable or disable the re-ranking step. When enabled, an additional model re-scores retrieved documents for better relevance.">
+                                <label class="form-check-label" for="rerankEnableSettings">Enable Re-ranking (Global)</label>
+                            </div>
+                            <div class="mb-3">
+                                <label for="rerankModel" class="form-label">Re-rank Model:</label>
+                                <select class="form-select" id="rerankModel" name="rerankModel" data-bs-toggle="tooltip" data-bs-placement="right" title="The name of the cross-encoder model used for re-ranking.">
+                                    <option value="cross-encoder/ms-marco-MiniLM-L-6-v2">ms-marco-MiniLM-L-6-v2</option>
+                                    <option value="cross-encoder/ms-marco-MiniLM-L-12-v2">ms-marco-MiniLM-L-12-v2</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="rerankTopN" class="form-label">Re-rank Top N: <span id="rerankTopNValue"></span></label>
+                                <input type="range" class="form-range" id="rerankTopN" name="rerankTopN" min="1" max="10" step="1" data-bs-toggle="tooltip" data-bs-placement="right" title="The number of top documents to keep after the re-ranking process. These are then passed to the LLM.">
+                            </div>
+                            <button type="submit" class="btn btn-primary">Save Settings</button>
+                        </form>
+                        <div id="settingsStatus" class="mt-3 alert" role="alert"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <script src="/static/script.js"></script>
+</body>
+</html>
