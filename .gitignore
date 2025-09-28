@@ -11,6 +11,7 @@ config.yaml
 
 # LlamaIndex
 data/
+input/
 
 # IDEs
 .vscode/

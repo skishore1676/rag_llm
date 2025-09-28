@@ -38,6 +38,23 @@ def create_index(project_path: str, config: dict, index_name: str):
         reader = SimpleDirectoryReader(project_path, recursive=True)
         documents = reader.load_data()
         logger.info(f"Loaded {len(documents)} documents.")
+
+        # Filter out documents with missing content and clean invalid metadata
+        valid_documents = []
+        for doc in documents:
+            if doc.text and doc.text.strip():  # Skip empty documents
+                # Clean metadata to only allow str, int, float, None
+                if hasattr(doc, 'metadata') and doc.metadata:
+                    cleaned_metadata = {}
+                    for key, value in doc.metadata.items():
+                        if isinstance(value, (str, int, float, type(None))):
+                            cleaned_metadata[key] = value
+                        else:
+                            cleaned_metadata[key] = str(value)  # Convert to string if invalid type
+                    doc.metadata = cleaned_metadata
+                valid_documents.append(doc)
+        documents = valid_documents
+        logger.info(f"After filtering, {len(documents)} valid documents remain.")
     except Exception as e:
         logger.error(f"Error loading documents: {str(e)}")
         raise
