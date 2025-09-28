@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Form
+from fastapi import FastAPI, Request, Form, BackgroundTasks
 from fastapi.responses import HTMLResponse
 from llama_index.core import (
     StorageContext,
@@ -14,45 +14,22 @@ from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import os
+import logging
 
 from app.core.config import load_config, save_config
 from app.core.indexer import create_index
 from app.core.querier import query_index
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 config = load_config()
-index: VectorStoreIndex | None = None # Global variable to hold the loaded index
+indexing_status: str = "ready" # Status for UI feedback
 
 app = FastAPI()
 
 # Mount static files (CSS, JS, etc.)
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
-
-@app.on_event("startup")
-def startup_event():
-    """Load the index into memory when the application starts."""
-    global index
-    storage_path = config["indexing"]["storage_path"]
-    storage_path = config["indexing"]["storage_path"]
-    if os.path.exists(storage_path):
-        print("Loading index from disk at startup...")
-        try:
-            # 1. Configure embedding model
-            print(f"Initializing embedding model: {config['embedding']['model']}")
-            embed_model = HuggingFaceEmbedding(model_name=config["embedding"]["model"])
-            Settings.embed_model = embed_model
-
-            # 2. Load the index from storage
-            db = chromadb.PersistentClient(path=storage_path)
-            chroma_collection = db.get_or_create_collection("default_collection")
-            vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
-            storage_context = StorageContext.from_defaults(
-                vector_store=vector_store, persist_dir=storage_path
-            )
-            index = load_index_from_storage(storage_context)
-            print("Index loaded successfully.")
-        except Exception as e:
-            print(f"Error loading index at startup: {e}")
-            index = None
 
 templates = Jinja2Templates(directory="app/templates")
 
@@ -88,6 +65,32 @@ async def update_config(new_config: dict):
     save_config(config)
     return {"status": "success", "message": "Configuration updated successfully."}
 
+async def index_in_background_and_update_status(project_path: str, index_name: str):
+    global indexing_status
+    try:
+        indexing_status = "indexing"
+        logger.info(f"Indexing in background for {project_path} as index {index_name}")
+        create_index(project_path, config, index_name)
+        logger.info(f"Indexing in background complete for {project_path}")
+    except Exception as e:
+        logger.error(f"An error occurred during background indexing for {project_path}: {str(e)}")
+    finally:
+        indexing_status = "ready"
+
+@app.get("/index/status")
+async def get_index_status():
+    global indexing_status
+    return {"status": indexing_status}
+
+@app.get("/indexes")
+async def get_indexes():
+    storage_path = config["indexing"]["storage_path"]
+    if not os.path.exists(storage_path):
+        return {"indexes": []}
+    # List subdirectories, which are the named indexes
+    subdirs = [d for d in os.listdir(storage_path) if os.path.isdir(os.path.join(storage_path, d))]
+    return {"indexes": subdirs}
+
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     # Reload config to ensure UI has the latest project paths
@@ -103,30 +106,30 @@ async def read_root(request: Request):
     return templates.TemplateResponse("index.html", template_vars)
 
 @app.post("/index")
-def index_project(project_path: str = Form(...)):
+async def index_project(background: BackgroundTasks, project_path: str = Form(...), index_name: str = Form(...)):
     if not os.path.isabs(project_path):
+        logger.error("Please provide an absolute path for indexing.")
         return {"status": "error", "message": "Please provide an absolute path for indexing."}
-    try:
-        create_index(project_path, config)
-        # Reload the index after creating it
-        startup_event()
-        return {"status": "success", "message": f"Indexing complete for {project_path}."}
-    except Exception as e:
-        return {"status": "error", "message": f"An error occurred during indexing: {str(e)}"}
+    background.add_task(index_in_background_and_update_status, project_path, index_name)
+    return {"status": "info", "message": "Indexing started in the background. Please wait a moment and then try querying."}
 
 @app.post("/query")
-async def query_project(question: str = Form(...), llm_type: str = Form(None), rerank_enable: bool = Form(False), chat_history: str = Form("[]")):
-    if index is None:
-        return {"answer": "Index is not loaded. Please index a project and ensure the server has started correctly.", "sources": []}
+async def query_project(question: str = Form(...), index_name: str = Form(...), llm_type: str = Form(None), rerank_enable: bool = Form(False), chat_history: str = Form("[]")):
+    try:
+        import json
+        chat_history_list = json.loads(chat_history)
+        # Load the correct index based on index_name
+        storage_path = os.path.join(config["indexing"]["storage_path"], index_name)
+        if not os.path.exists(storage_path):
+            return {"answer": f"Index '{index_name}' does not exist. Please select a valid index.", "sources": []}
 
-    import json
-    chat_history_list = json.loads(chat_history)
-    # Pass the pre-loaded index object for high performance
-    answer_data = query_index(question, index, config, llm_type, rerank_enable, chat_history_list)
-    return answer_data
+        logger.info(f"Query received: {question} for index {index_name}")
+        answer_data = query_index(question, index_name, config, llm_type, rerank_enable, chat_history_list)
+        logger.info("Query completed successfully")
+        return answer_data
+    except Exception as e:
+        logger.error(f"An error occurred during querying: {str(e)}")
+        return {"answer": "An error occurred while processing your query. Please try again.", "sources": []}
 
 if __name__ == "__main__":
-    # Ensure the 'static' and 'templates' directories exist
-    os.makedirs("static", exist_ok=True)
-    os.makedirs("templates", exist_ok=True)
     uvicorn.run(app, host="0.0.0.0", port=8000)

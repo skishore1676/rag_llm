@@ -2,8 +2,28 @@ document.getElementById('predefinedPath').addEventListener('change', (event) => 
     document.getElementById('projectPath').value = event.target.value;
 });
 
+async function fetchAndPopulateIndexes() {
+    try {
+        const response = await fetch('/indexes');
+        const data = await response.json();
+        const selectElement = document.getElementById('queryIndexName');
+        selectElement.innerHTML = '<option value="">Select an index</option>';
+        data.indexes.forEach(index => {
+            const option = document.createElement('option');
+            option.value = index;
+            option.textContent = index;
+            selectElement.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error fetching indexes:', error);
+        const selectElement = document.getElementById('queryIndexName');
+        selectElement.innerHTML = '<option value="">Error loading indexes</option>';
+    }
+}
+
 document.getElementById('indexForm').addEventListener('submit', async (event) => {
     event.preventDefault();
+    const indexName = document.getElementById('indexName').value;
     const projectPath = document.getElementById('projectPath').value;
     const indexStatus = document.getElementById('indexStatus');
     indexStatus.textContent = 'Indexing...';
@@ -15,13 +35,33 @@ document.getElementById('indexForm').addEventListener('submit', async (event) =>
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: `project_path=${encodeURIComponent(projectPath)}`,
+            body: `project_path=${encodeURIComponent(projectPath)}&index_name=${encodeURIComponent(indexName)}`,
         });
         const data = await response.json();
         indexStatus.textContent = data.message;
         if (data.status === 'success') {
             indexStatus.style.backgroundColor = '#d4edda';
             indexStatus.style.color = '#155724';
+        } else if (data.status === 'info') {
+            indexStatus.style.backgroundColor = '#d1ecf1';
+            indexStatus.style.color = '#0c5460';
+            // Poll for indexing completion
+            const statusInterval = setInterval(async () => {
+                try {
+                    const res = await fetch('/index/status');
+                    const statusData = await res.json();
+                    if (statusData.status === 'ready') {
+                        clearInterval(statusInterval);
+                        indexStatus.textContent = 'Indexing complete. You can now query!';
+                        indexStatus.style.backgroundColor = '#d4edda';
+                        indexStatus.style.color = '#155724';
+                        // Refresh indexes list
+                        fetchAndPopulateIndexes();
+                    }
+                } catch (error) {
+                    console.error('Error checking index status:', error);
+                }
+            }, 5000);
         } else {
             indexStatus.style.backgroundColor = '#f8d7da';
             indexStatus.style.color = '#721c24';
@@ -155,15 +195,21 @@ document.getElementById('clearChatBtn').addEventListener('click', () => {
     document.getElementById('queryAnswer').classList.remove('alert-success', 'alert-danger', 'alert-info');
 });
 
+document.getElementById('refreshIndexesBtn').addEventListener('click', fetchAndPopulateIndexes);
+
+// Initialize indexes on page load
+document.addEventListener('DOMContentLoaded', fetchAndPopulateIndexes);
+
 document.getElementById('queryForm').addEventListener('submit', async (event) => {
     event.preventDefault();
     const questionInput = document.getElementById('question');
     const question = questionInput.value;
+    const indexName = document.getElementById('queryIndexName').value;
     const llmType = document.getElementById('llmType').value;
     const rerankEnable = document.getElementById('rerankEnable').checked;
     const queryAnswer = document.getElementById('queryAnswer');
 
-    if (!question) return;
+    if (!question || !indexName) return;
 
     displayMessage('user', question);
     chatHistory.push({ role: 'user', content: question });
@@ -179,10 +225,10 @@ document.getElementById('queryForm').addEventListener('submit', async (event) =>
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: `question=${encodeURIComponent(question)}&llm_type=${encodeURIComponent(llmType)}&rerank_enable=${rerankEnable}&chat_history=${encodeURIComponent(JSON.stringify(chatHistory))}`,
+            body: `question=${encodeURIComponent(question)}&index_name=${encodeURIComponent(indexName)}&llm_type=${encodeURIComponent(llmType)}&rerank_enable=${rerankEnable}&chat_history=${encodeURIComponent(JSON.stringify(chatHistory))}`,
         });
         const data = await response.json();
-        
+
         displayMessage('assistant', data.answer);
         chatHistory.push({ role: 'assistant', content: data.answer });
 
