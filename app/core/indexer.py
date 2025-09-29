@@ -55,6 +55,11 @@ def create_index(project_path: str, config: dict, index_name: str):
                 file_path = os.path.join(root, file)
                 file_ext = os.path.splitext(file)[1].lower()
 
+                # Skip temporary Office files (start with ~$)
+                if file.startswith('~$'):
+                    logger.debug(f"Skipping temporary Office file: {file_path}")
+                    continue
+
                 # Process only supported file types
                 if file_ext in supported_extensions:
                     try:
