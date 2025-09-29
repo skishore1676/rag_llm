@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Form, BackgroundTasks
+from fastapi import FastAPI, Request, Form, BackgroundTasks, HTTPException
 from fastapi.responses import HTMLResponse
 from llama_index.core import (
     StorageContext,
@@ -19,6 +19,7 @@ import logging
 from app.core.config import load_config, save_config
 from app.core.indexer import create_index
 from app.core.querier import query_index
+from app.core.agent.master_agent import MasterAgent
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -130,6 +131,20 @@ async def query_project(question: str = Form(...), index_name: str = Form(...), 
     except Exception as e:
         logger.error(f"An error occurred during querying: {str(e)}")
         return {"answer": "An error occurred while processing your query. Please try again.", "sources": []}
+
+@app.post("/agent-query")
+async def agent_query(question: str = Form(...), index_name: str = Form(...), excel_path: str = Form(...)):
+    if not os.path.isfile(excel_path):
+        raise HTTPException(status_code=400, detail="Excel file not found.")
+
+    try:
+        master_agent = MasterAgent(config, index_name, excel_path)
+        response = master_agent.query(question)
+        logger.info("Agent query completed successfully")
+        return {"answer": response}
+    except Exception as e:
+        logger.error(f"An error occurred during agent querying: {str(e)}")
+        return {"answer": "An error occurred while processing your agent query. Please try again."}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

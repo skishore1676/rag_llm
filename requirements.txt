@@ -16,3 +16,6 @@ llama-index-llms-ollama
 sentence-transformers
 unstructured[all-docs]
 python-magic
+pandas
+llama-index-experimental
+matplotlib

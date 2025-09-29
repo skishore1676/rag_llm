@@ -7,12 +7,11 @@ from llama_index.core import (
     StorageContext,
     load_index_from_storage,
 )
-from llama_index.llms.openai import OpenAI
-from llama_index.llms.ollama import Ollama
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.vector_stores.chroma import ChromaVectorStore
 from llama_index.core.postprocessor import SentenceTransformerRerank
 import chromadb
+from .llm_factory import create_llm
 
 logger = logging.getLogger(__name__)
 
@@ -38,21 +37,7 @@ def query_index(query_text: str, index_name: str, config: dict, llm_type: str = 
     )
 
     # 2. Configure LLM
-    current_llm_type = llm_type if llm_type else config["llm"]["type"]
-
-    if current_llm_type == "ollama":
-        Settings.llm = Ollama(
-            model=config["llm"]["ollama_model"],
-            base_url=config["llm"]["ollama_base_url"],
-            temperature=config["llm"]["temperature"],
-            request_timeout=120.0,  # Set a longer timeout (in seconds)
-        )
-    else: # Default to openai
-        Settings.llm = OpenAI(
-            model=config["llm"]["model"],
-            temperature=config["llm"]["temperature"],
-            api_key=config["llm"]["api_key"],
-        )
+    Settings.llm = create_llm(config, llm_type)
 
     try:
         # Build chat history string

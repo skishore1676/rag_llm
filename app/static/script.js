@@ -258,3 +258,54 @@ document.getElementById('queryForm').addEventListener('submit', async (event) =>
         queryAnswer.classList.add('alert-danger');
     }
 });
+
+document.getElementById('agentQueryBtn').addEventListener('click', async () => {
+    const questionInput = document.getElementById('question');
+    const question = questionInput.value;
+    const indexName = document.getElementById('queryIndexName').value;
+    const excelPath = document.getElementById('excelPath').value;
+    const queryAnswer = document.getElementById('queryAnswer');
+
+    if (!question || !indexName || !excelPath) {
+        alert('Please fill all fields: question, index name, and Excel path.');
+        return;
+    }
+
+    displayMessage('user', question);
+    chatHistory.push({ role: 'user', content: question });
+    questionInput.value = ''; // Clear input
+
+    queryAnswer.textContent = 'Searching...';
+    queryAnswer.classList.remove('alert-success', 'alert-danger');
+    queryAnswer.classList.add('alert-info');
+
+    try {
+        const response = await fetch('/agent-query', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `question=${encodeURIComponent(question)}&index_name=${encodeURIComponent(indexName)}&excel_path=${encodeURIComponent(excelPath)}`,
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.detail || 'Error in agent query');
+        }
+
+        displayMessage('assistant', data.answer);
+        chatHistory.push({ role: 'assistant', content: data.answer });
+
+        // Hide source documents for agent queries
+        const sourceDocumentsDiv = document.getElementById('sourceDocuments');
+        sourceDocumentsDiv.style.display = 'none';
+
+        queryAnswer.textContent = 'Query successful!';
+        queryAnswer.classList.remove('alert-info');
+        queryAnswer.classList.add('alert-success');
+    } catch (error) {
+        queryAnswer.textContent = `Error: ${error.message}`;
+        queryAnswer.classList.remove('alert-info');
+        queryAnswer.classList.add('alert-danger');
+    }
+});
