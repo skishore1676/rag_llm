@@ -28,6 +28,12 @@ indexing:
 retrieval:
   similarity_top_k: 3
 
+# Parser Settings
+parser:
+  type: "unstructured" # The default parser to use. Others could be "llamaparse", "google_doc_ai", etc.
+  unstructured:
+    strategy: "hi_res" # Strategy for unstructured.io parser
+
 # Re-ranking Settings
 rerank:
   enable: true

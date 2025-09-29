@@ -2,13 +2,14 @@ import os
 import logging
 from llama_index.core import (
     VectorStoreIndex,
-    SimpleDirectoryReader,
     StorageContext,
     Settings,
 )
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.vector_stores.chroma import ChromaVectorStore
 import chromadb
+
+from .parser import ParserFactory
 
 logger = logging.getLogger(__name__)
  
@@ -31,13 +32,41 @@ def create_index(project_path: str, config: dict, index_name: str):
 
     # 2. Load documents
     logger.info(f"Loading documents from: {project_path}")
-    # LlamaIndex's SimpleDirectoryReader requires the input directory to exist.
     if not os.path.isdir(project_path):
         raise ValueError(f"Directory not found at {project_path}")
+
     try:
-        reader = SimpleDirectoryReader(project_path, recursive=True)
-        documents = reader.load_data()
-        logger.info(f"Loaded {len(documents)} documents.")
+        # Get parser configuration and instantiate parser
+        parser_config = config.get("parser", {"type": "unstructured"})
+        parser = ParserFactory.get_parser(parser_config)
+        logger.info(f"Using parser: {type(parser).__name__}")
+
+        # Define supported file extensions for document processing
+        supported_extensions = {
+            '.txt', '.md', '.pdf', '.docx', '.doc', '.xlsx', '.xls',
+            '.pptx', '.ppt', '.csv', '.html', '.htm'
+        }
+
+        documents = []
+        processed_files_count = 0
+        # Walk through directory recursively to find files
+        for root, dirs, files in os.walk(project_path):
+            for file in files:
+                file_path = os.path.join(root, file)
+                file_ext = os.path.splitext(file)[1].lower()
+
+                # Process only supported file types
+                if file_ext in supported_extensions:
+                    try:
+                        logger.debug(f"Parsing file: {file_path}")
+                        file_documents = parser.parse(file_path)
+                        documents.extend(file_documents)
+                        processed_files_count += 1
+                    except Exception as e:
+                        logger.warning(f"Failed to parse {file_path}: {str(e)}")
+                        continue
+
+        logger.info(f"Loaded {len(documents)} documents from {processed_files_count} files.")
 
         # Filter out documents with missing content and clean invalid metadata
         valid_documents = []
