@@ -4,12 +4,12 @@ from llama_index.core import (
     VectorStoreIndex,
     StorageContext,
     Settings,
+    SimpleDirectoryReader,
 )
+from llama_index.readers.file.unstructured import UnstructuredReader
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.vector_stores.chroma import ChromaVectorStore
 import chromadb
-
-from .parser import ParserFactory
 
 logger = logging.getLogger(__name__)
  
@@ -36,42 +36,22 @@ def create_index(project_path: str, config: dict, index_name: str):
         raise ValueError(f"Directory not found at {project_path}")
 
     try:
-        # Get parser configuration and instantiate parser
-        parser_config = config.get("parser", {"type": "unstructured"})
-        parser = ParserFactory.get_parser(parser_config)
-        logger.info(f"Using parser: {type(parser).__name__}")
-
-        # Define supported file extensions for document processing
-        supported_extensions = {
-            '.txt', '.md', '.pdf', '.docx', '.doc', '.xlsx', '.xls',
-            '.pptx', '.ppt', '.csv', '.html', '.htm'
+        # Define the file extractor to use Unstructured for specific file types
+        file_extractor = {
+            ".pdf": UnstructuredReader(),
+            ".pptx": UnstructuredReader(),
+            ".docx": UnstructuredReader(),
         }
 
-        documents = []
-        processed_files_count = 0
-        # Walk through directory recursively to find files
-        for root, dirs, files in os.walk(project_path):
-            for file in files:
-                file_path = os.path.join(root, file)
-                file_ext = os.path.splitext(file)[1].lower()
+        # Use SimpleDirectoryReader with the configured extractor
+        reader = SimpleDirectoryReader(
+            project_path,
+            recursive=True,
+            file_extractor=file_extractor
+        )
 
-                # Skip temporary Office files (start with ~$)
-                if file.startswith('~$'):
-                    logger.debug(f"Skipping temporary Office file: {file_path}")
-                    continue
-
-                # Process only supported file types
-                if file_ext in supported_extensions:
-                    try:
-                        logger.debug(f"Parsing file: {file_path}")
-                        file_documents = parser.parse(file_path)
-                        documents.extend(file_documents)
-                        processed_files_count += 1
-                    except Exception as e:
-                        logger.warning(f"Failed to parse {file_path}: {str(e)}")
-                        continue
-
-        logger.info(f"Loaded {len(documents)} documents from {processed_files_count} files.")
+        documents = reader.load_data()
+        logger.info(f"Loaded {len(documents)} document(s).")
 
         # Filter out documents with missing content and clean invalid metadata
         valid_documents = []
