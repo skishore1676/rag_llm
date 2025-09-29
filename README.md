@@ -1,10 +1,12 @@
-# RAG LLM Project
+# Agentic RAG LLM Project
 
-This project provides a web-based and command-line interface for a Retrieval-Augmented Generation (RAG) system. You can index local code repositories or document folders and ask questions about them using either OpenAI or a local Ollama model.
+This project provides a web-based and command-line interface for an advanced Retrieval-Augmented Generation (RAG) system with intelligent agent capabilities. Index local code repositories or document folders, analyze Excel spreadsheets, and ask complex analytical questions that intelligently route between multiple tools using either OpenAI or a local Ollama model.
 
 ## Features
 -   Web UI for indexing, querying, and configuring the application.
 -   Command-line interface for scripting and terminal-based usage.
+-   Agentic RAG with intelligent multi-tool routing (document search + data analysis).
+-   Excel spreadsheet analysis using LLM-powered pandas code generation.
 -   Supports both OpenAI and local Ollama LLMs.
 -   Uses ChromaDB for persistent vector storage.
 -   Includes an optional re-ranking step to improve retrieval quality.
@@ -91,11 +93,14 @@ This section provides an overview of the project's components and the data flow 
 
 #### Core Components
 
-*   **FastAPI Backend (`app/main.py`):** Serves the web interface and provides API endpoints for indexing (`/index`), querying (`/query`), and managing settings (`/config`).
+*   **FastAPI Backend (`app/main.py`):** Serves the web interface and provides API endpoints for indexing (`/index`), RAG querying (`/query`), agent querying (`/agent-query`), and managing settings (`/config`).
 *   **Web Interface (HTML/JS/CSS):** A single-page application in `app/templates` and `app/static` that allows users to interact with the backend.
 *   **Command-Line Interface (`cli.py`):** Offers a terminal-based way to run the indexing and querying processes.
 *   **Indexer (`app/core/indexer.py`):** Responsible for reading source documents, generating embeddings, and storing them.
 *   **Querier (`app/core/querier.py`):** Handles user questions by retrieving relevant documents from the index and using an LLM to generate an answer.
+*   **LLM Factory (`app/core/llm_factory.py`):** Centralizes LLM initialization logic for reuse across different components.
+*   **Pandas Agent (`app/core/agent/pandas_agent.py`):** Provides Excel spreadsheet analysis using LLM-generated pandas code for quantitative queries.
+*   **Master Agent (`app/core/agent/master_agent.py`):** Implements an intelligent router that uses LlamaIndex's ReAct agent to orchestrate between document search and data analysis tools based on query intent.
 *   **Configuration (`config.yaml`):** A central file to manage all settings, such as API keys, model names, and storage paths.
 
 #### Indexing Pipeline
@@ -123,9 +128,38 @@ When you ask a question, the RAG (Retrieval-Augmented Generation) pipeline is ex
 6.  **Generation (Augmentation):** The original question, along with the retrieved (and re-ranked) document chunks, are combined into a single prompt. This is sent to the selected LLM (OpenAI or Ollama).
 7.  **Response:** The LLM generates an answer based on the provided context. The final answer and the source document chunks used to generate it are sent back to the user.
 
+#### Agent Querying Pipeline
+
+When you ask an agent query, the system uses an intelligent multi-tool routing system powered by LlamaIndex's ReAct agent:
+
+1.  **Initiation:** The user submits a question and provides paths to both an index and an Excel file through the Web UI.
+2.  **Agent Setup:** A `MasterAgent` is instantiated with the provided index name and Excel path. It initializes two tools:
+   - **Document Query Tool:** A wrapper around the standard RAG querier with detailed docstrings indicating it's best for qualitative questions, summaries, and document-based information.
+   - **Data Analysis Tool:** A wrapper around the PandasAgent with docstrings indicating it's optimal for quantitative queries, calculations, and Excel data manipulation.
+3.  **ReAct Agent Creation:** LlamaIndex's `ReActAgent` is configured with both tools and the appropriate LLM. The agent receives a system prompt instructing it to use the appropriate tool(s) based on query intent.
+4.  **Intelligent Tool Selection:**
+   - The agent analyzes the user's natural language question.
+   - Based on the question content, it determines whether to use document search, data analysis, or a combination of both tools in sequence.
+   - The agent can invoke tools multiple times if needed to answer complex, multi-step questions.
+5.  **Execution and Synthesis:** The selected tool(s) are executed with the user's question. If multiple tools are used, their results are synthesized into a coherent final answer.
+6.  **Response:** The agent provides a final answer that may combine insights from both document search and spreadsheet analysis, presented as a unified response to the user.
+
 ---
 
 ### Project Enhancements Log
+
+#### 5.0.0 Master Agent Implementation
+
+**Enhancement:** The application now features an intelligent multi-tool agent system capable of routing queries between document search and Excel data analysis using LlamaIndex's ReAct agent framework.
+
+**Implementation Details:**
+*   **LLM Factory (`app/core/llm_factory.py`):** Created a centralized factory function for LLM initialization, eliminating code duplication between querier and agent modules.
+*   **Pandas Agent (`app/core/agent/pandas_agent.py`):** New module that loads Excel files into pandas DataFrames and enables LLM-powered data analysis through LlamaIndex's PandasQueryEngine.
+*   **Master Agent (`app/core/agent/master_agent.py`):** Implements the intelligent router using ReAct agent with FunctionTool wrappers around document querier and pandas agent. Includes detailed docstrings to guide tool selection based on query intent.
+*   **Backend Integration (`app/main.py`):** Added `/agent-query` endpoint that accepts questions, index names, and Excel file paths, with proper validation and error handling.
+*   **Frontend Updates (`app/templates/index.html`, `app/static/script.js`):** Added Excel file path input and separate "Ask Agent (RAG + Data)" button with validation. Agent queries don't display source documents since they may combine multiple tools.
+*   **Dependencies Update (`requirements.txt`):** Added `pandas`, `llama-index-experimental`, and `matplotlib` for Excel analysis and agent capabilities.
+*   **Documentation Enhancement:** Updated README with agentic features, new pipeline documentation, and comprehensive architecture overview.
 
 #### 4.9.4 Configuration and Stability Refactor
 
