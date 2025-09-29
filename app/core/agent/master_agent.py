@@ -4,7 +4,7 @@ from llama_index.core.tools import FunctionTool
 from llama_index.core.agent import ReActAgent
 from ..querier import query_index
 from .pandas_agent import PandasAgent
-from ...llm_factory import create_llm
+from ..llm_factory import create_llm
 
 logger = logging.getLogger(__name__)
 
